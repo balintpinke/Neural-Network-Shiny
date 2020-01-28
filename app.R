@@ -12,16 +12,14 @@ df <- read.csv2("NHL_cleaned.csv")
 apply(df, 2, function(x) sum(is.na(x)))
 df = df[!is.na(df$Salary),]
 
-
-
 #train neural network for predicting salary
 
 ui <- dashboardPage(
-  dashboardHeader(title = "Neural network Demo"),
+  dashboardHeader(title = "Neural network Demo with neuralnet package", titleWidth = 500),
   dashboardSidebar(collapsed = TRUE,
                    sidebarMenu()),
   dashboardBody(
-
+    fluidPage(
     box(title="Input parameters", width = 6, 
         column(width = 6,
     numericInput("training_proportion", "Training data proportion", 0.7, min=0.01, max = 0.99, step = 0.01)
@@ -36,7 +34,7 @@ ui <- dashboardPage(
     numericInput("hidden_one_layer", "The number of hidden neurons in one layer", 3, min=0, max = 7, step = 1)
     ),
         column(width = 6,
-    numericInput("repetition", "The number of repetitions for the neural network's training", 3, min=1, max = 100, step = 1)
+    numericInput("repetition", "The number of repetitions for the neural network's training", 1, min=1, max = 1, step = 1)
     ),
         column(width = 6,
     numericInput("stepmax", "Maximum steps for the training of the neural network", 100000, min=10000, max = 1000000, step = 1000)
@@ -48,21 +46,34 @@ ui <- dashboardPage(
                 `deselect-all-text` = "None...",
                 `select-all-text` = "Choose all",
                 `none-selected-text` = "Choose variables"
-    ))
+    )),
+    actionButton("nn_start", "Click to train neural network")
     )
     
     ),
     box(title="Demo data", width = 6,
         dataTableOutput("table")
     ),
+  conditionalPanel(
+    condition = "input.nn_start",
   
-    actionButton("nn_start", "Start NN"),
-    dataTableOutput("nn_table"),
-    dataTableOutput("orig_pred_table"),
-    dataTableOutput("cor_table"),
-    plotOutput("nn_plot")
+    box(title = "Neural network plot", width = 12,
+        plotOutput("nn_plot")
+    ),
+    box(title = "Modell results" ,width = 5,
+        dataTableOutput("nn_table")
+    ),
+    box(title = "Prediction", width = 5,
+        dataTableOutput("orig_pred_table")
+    ),
+    box(title = "Correlation", width = 2,    
+        dataTableOutput("cor_table")
+    )#,
+        # plotOutput("nn_plot_2")
   )
-)
+  ) # end of fluidPage
+) # end of dashboardBody
+) # end of dashboardPage
 
 server <- function(input, output) { 
   
@@ -72,11 +83,10 @@ server <- function(input, output) {
                                                 scrollX = 200,
                                                 deferRender = TRUE,
                                                 scroller = TRUE)))
-
-                                     
-  
-  nn_list <- eventReactive(input$nn_start, {
-    
+  #training nn
+    observeEvent(input$nn_start, {    
+      
+    withProgress(message = 'Training neural network', value = 0, {
     #normalization
     df=data.frame(scale(df))
     #training and test data
@@ -96,13 +106,14 @@ server <- function(input, output) {
     rep=input$repetition
     stepmax=input$stepmax
     # threshold=0.1
-    # hidden=1
-    # rep=3
+    # hidden=3
+    # rep=1
     # stepmax=100000
-    # 
+  
+    
       
-    neural_network <- neuralnet(Salary ~ Age + Goal + Assist + Points + Plus_minus, 
-                              # nn_formula,
+    neural_network <- neuralnet(#Salary ~ Age + Goal + Assist + Points + Plus_minus,
+                                nn_formula,
                                 data = train_df,
                                 hidden = hidden,
                                 threshold = threshold,
@@ -111,27 +122,29 @@ server <- function(input, output) {
                                 lifesign = "full")
     
     df <- data.frame(neural_network[["result.matrix"]])
+    colnames(df)[1]=c("Result matrix")
     
     model_results <- predict(neural_network, test_df[1:8])
     orig_pred=data.frame(cbind(test_df$Salary, model_results))
-    # predicted_strength <- model_results$net.result
-    cor=data.frame(cor(model_results, test_df$Salary))
-
-    list=list(df1 = df, df2 = orig_pred, df3 = cor)
-    list
-    # print(class(list[['df3']]))
+    colnames(orig_pred)=c("Salary", "Salary prediction")
     
+    # predicted_strength <- model_results$net.result
+    cor=data.frame(round(cor(model_results, test_df$Salary),2))
+    colnames(cor)[1]=c("Correlation between Salary and Prediction")
+    
+    output$nn_table <- renderDataTable(df, options = list(searching = FALSE))
+    
+    output$orig_pred_table <- renderDataTable(orig_pred, options = list(searching = FALSE))
+    
+    output$cor_table <- renderDataTable(cor, options = list(searching = FALSE))
+    
+    output$nn_plot <- renderPlot(plot(neural_network, rep="best"))
+    
+    # output$nn_plot_2 <- renderPlot(plot(orig_pred))
+    
+      })
     })
   
-  
-  
-  output$nn_table <- renderDataTable(nn_list()[['df1']])
-  
-  output$orig_pred_table <- renderDataTable(nn_list()[['df2']])
-  
-  output$cor_table <- renderDataTable(nn_list()[['df3']])
-    
-  # output$nn_plot <- renderPlot(nn_list()[['df3']])
   
   }
 
