@@ -21,6 +21,8 @@ ui <- dashboardPage(
   dashboardBody(
     fluidPage(
     box(title="Input parameters", width = 6, 
+        p("The user can train a neural network for predicting NHL players salary with this Shiny app. 
+           Right now the user can only add one hidden layer with arbitrary neurons."),
         column(width = 6,
     numericInput("training_proportion", "Training data proportion", 0.7, min=0.01, max = 0.99, step = 0.01)
     ),
@@ -34,7 +36,7 @@ ui <- dashboardPage(
     numericInput("hidden_one_layer", "The number of hidden neurons in one layer", 3, min=0, max = 7, step = 1)
     ),
         column(width = 6,
-    numericInput("repetition", "The number of repetitions for the neural network's training", 1, min=1, max = 1, step = 1)
+    numericInput("repetition", "The number of repetitions for the neural network's training", 1, min=1, max = 10, step = 1)
     ),
         column(width = 6,
     numericInput("stepmax", "Maximum steps for the training of the neural network", 100000, min=10000, max = 1000000, step = 1000)
@@ -86,7 +88,7 @@ server <- function(input, output) {
   #training nn
     observeEvent(input$nn_start, {    
       
-    withProgress(message = 'Training neural network', value = 0, {
+    withProgress(message = 'Training neural network', detail = "Wait for it...", value = 0, {
     #normalization
     df=data.frame(scale(df))
     #training and test data
